@@ -14,34 +14,41 @@ Provided Makefile should work on lilo4 (or any other linux system). However, if 
 ##Running the code
 First, you'll need to edit config.txt file, containing configuration of the coil. Only two shapes are supported now: Circle and Coil. It is quite easy to add more shapes if you have some basic understanding of C++. config.txt must have the following form:
 - for Circle:
-	SHAPE: CIRCLE
-	RADIUS: <number>
-	CURRENT: <number>
-	X_MIN: <number>
-	X_MAX: <number>
-	X_STEP: <number>
-	Y_MIN: <number>
-	Y_MAX: <number>
-	Y_STEP: <number>
-	Z_MIN: <number>
-	Z_MAX: <number>
-	Z_STEP: <number>
+```
+SHAPE: CIRCLE
+RADIUS: <number>
+CURRENT: <number>
+X_MIN: <number>
+X_MAX: <number>
+X_STEP: <number>
+Y_MIN: <number>
+Y_MAX: <number>
+Y_STEP: <number>
+Z_MIN: <number>
+Z_MAX: <number>
+Z_STEP: <number>
+MAX_LEN: <number>
+```
+
 - for Coil:
-	SHAPE: COIL
-	RADIUS: <number>
-	CURRENT: <number>
-	NR_TURNS: <number>
-	LENGTH: <number>
-	X_MIN: <number>
-	X_MAX: <number>
-	X_STEP: <number>
-	Y_MIN: <number>
-	Y_MAX: <number>
-	Y_STEP: <number>
-	Z_MIN: <number>
-	Z_MAX: <number>
-	Z_STEP: <number>
-where <number> stands some number.
+```
+SHAPE: COIL
+RADIUS: <number>
+CURRENT: <number>
+NR_TURNS: <number>
+LENGTH: <number>
+X_MIN: <number>
+X_MAX: <number>
+X_STEP: <number>
+Y_MIN: <number>
+Y_MAX: <number>
+Y_STEP: <number>
+Z_MIN: <number>
+Z_MAX: <number>
+Z_STEP: <number>
+MAX_LEN: <number>
+```
+where `<number>` stands some number.
 
 Now you can run the program with `./main`. It produces two files: 
 - `curve.dat` containing the information about the curve (Circle or Coil);

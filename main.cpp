@@ -13,15 +13,12 @@ extern "C" {
 
 #include "gnuplot-iostream.h"
 #include "vector3D.h"
+#include "configure.h"
 
 
-#define REL_ERROR 1.E-3
-#define ABS_ERROR 1.E-5
 #define LIMIT 1000
 #define MU0_4_PI 1.E-7
-#define CONFIG "config.txt"
-#define CURVE_DAT "curve.dat"
-#define FIELD_DAT "field.dat"
+
 
 std::ostream& operator <<(std::ostream& out, const std::tuple<vector3D, vector3D>& field) 
 {
@@ -124,26 +121,26 @@ double integrand(double t, void* params)
 }
 
 
-std::tuple<vector3D, vector3D> biot_savart(Curve* curve, const vector3D &point) 
+std::tuple<vector3D, vector3D> biot_savart(Curve* curve, const vector3D &point, gsl_integration_workspace* workspace) 
 {
 	
 	vector3D result{0, 0, 0};
 	vector3D error{0, 0, 0};
 	Params params(curve, &point);
 
-	gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(LIMIT);
+	//gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(LIMIT);
 	
 	gsl_function f = {&integrand<0>, static_cast<void*>(&params)};
-	gsl_integration_qag (	&f, 0, curve->period, ABS_ERROR, REL_ERROR, LIMIT, 
-				GSL_INTEG_GAUSS41, workspace, &result.x, &error.x);
+	gsl_integration_qag (	&f, - curve->period/2, curve->period/2, ABS_ERROR, REL_ERROR, LIMIT, 
+				KEY, workspace, &result.x, &error.x);
 	f.function = &integrand<1>;
-	gsl_integration_qag (	&f, 0, curve->period, ABS_ERROR, REL_ERROR, LIMIT, 
-				GSL_INTEG_GAUSS41, workspace, &result.y, &error.y);
+	gsl_integration_qag (	&f, - curve->period/2, curve->period/2, ABS_ERROR, REL_ERROR, LIMIT, 
+				KEY, workspace, &result.y, &error.y);
 	f.function = &integrand<2>;
-	gsl_integration_qag (	&f, 0, curve->period, ABS_ERROR, REL_ERROR, LIMIT, 
-				GSL_INTEG_GAUSS41, workspace, &result.z, &error.z);
+	gsl_integration_qag (	&f, - curve->period/2, curve->period/2, ABS_ERROR, REL_ERROR, LIMIT, 
+				KEY, workspace, &result.z, &error.z);
 
-	gsl_integration_workspace_free(workspace);
+	//gsl_integration_workspace_free(workspace);
 
 	return std::tuple<vector3D, vector3D>(MU0_4_PI * result, MU0_4_PI * error);
 }
@@ -228,7 +225,7 @@ void read_coil(std::ifstream& infile, double& distance, Curve* &curve) {
 	distance = radius + 0.5 * length;
 }
 
-void read_range(std::ifstream& infile, const std::string& pre, double& min, double& max, double& step) 
+void read_range(std::ifstream& infile, const std::string& pre, double& min, double& max, std::size_t& nr_steps, double& step) 
 {
 	std::string str;
 	infile >> str;
@@ -252,14 +249,19 @@ void read_range(std::ifstream& infile, const std::string& pre, double& min, doub
 	std::cout << '\t' << static_cast<char>(tolower(pre[0])) << "_max = " << max << "\n";
 
 	infile >> str;
-	if(str != pre + "_STEP:") {
-		std::cerr << "expected '"<< pre << "_STEP:', but" << str << "was found\n"
+	if(str != pre + "_NR_STEPS:") {
+		std::cerr << "expected '"<< pre << "NR_STEPS:', but" << str << "was found\n"
 			  << "terminating...\n";
 		infile.close();
 		exit(1);
 	}
-	infile >> step;
-	std::cout << '\t' << static_cast<char>(tolower(pre[0])) << "_step = " << step << "\n";
+	infile >> nr_steps;
+	step = (max - min) / nr_steps;
+	if(nr_steps%2 && min != max) {
+		min += step/2.;
+		std::cout << '\t' << static_cast<char>(tolower(pre[0])) << "_min redefined, new value is " << min << "\n";
+	}
+	std::cout << '\t' << static_cast<char>(tolower(pre[0])) << "_nr_steps = " << nr_steps << "\n";
 }
 
 
@@ -294,6 +296,7 @@ int main()
 	Curve* curve = nullptr;
 	infile >> str;
 	double distance, max_len;
+	std::size_t x_nr_steps, y_nr_steps, z_nr_steps;
 	double x_min, x_max, x_step;
 	double y_min, y_max, y_step;
 	double z_min, z_max, z_step;
@@ -308,9 +311,9 @@ int main()
 				read_coil(infile, distance, curve);
 				break;
 		}
-		read_range(infile, "X", x_min, x_max, x_step);
-		read_range(infile, "Y", y_min, y_max, y_step);
-		read_range(infile, "Z", z_min, z_max, z_step);
+		read_range(infile, "X", x_min, x_max, x_nr_steps, x_step);
+		read_range(infile, "Y", y_min, y_max, y_nr_steps, y_step);
+		read_range(infile, "Z", z_min, z_max, z_nr_steps, z_step);
 
 		infile>>str;
 		if(str != "MAX_LEN:") {
@@ -320,7 +323,7 @@ int main()
 			exit(1);
 		}
 		infile >> max_len;
-		std::cout << "max_len = " << max_len << "\n";
+		std::cout << "\tmax_len = " << max_len << "\n";
 	} catch(const std::out_of_range& e) {
 		std::cerr << e.what() << "\n";
 		std::cerr << "Unknown shape '" << str << "'\n"
@@ -336,34 +339,36 @@ int main()
 	outfile << "#x\ty\tz\tBx\tBx_err\tBy\tBy_err\tBz\tBz_err\n";
 	int percent_done = 0;
 	std::cout << "\rCalculating field: " << percent_done << "%" << std::flush;
-	double step = 0.17*distance;
 	double max_field = 0;
-	for(double x = x_min; x <= x_max; x += x_step) {
-		for(double y = y_min; y <= y_max; y += y_step) {
-			for(double z = z_min; z <= z_max; z += z_step) {
+	gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(LIMIT);
+	
+	for(auto i=0; i < x_nr_steps; i++) {
+		double x = x_min + i*x_step;
+		for(auto j=0; j < y_nr_steps; j++) {
+			double y = y_min + j*y_step;
+			for(auto k=0; k < z_nr_steps; k++) {
+				double z = z_min + k*z_step;
 				vector3D point{x, y, z};
-			
 				if( !curve->is_singular(point) ) {
 					std::tuple<vector3D, vector3D> 
-						field = biot_savart(curve, point);
+						field = biot_savart(curve, point, workspace);
 					if(std::get<0>(field).length() > max_field) 
 						max_field = std::get<0>(field).length();
-					outfile << point << '\t' << field << '\n';
+					outfile << point << '\t' << field << '\t' << std::get<0>(field).length() << '\n';
 				}
 			}
-			if(y_max-y_min)
-				percent_done = static_cast<int>(100*(x-x_min)/(x_max-x_min) * (y-y_min)/(y_max-y_min));
-			else if(x_max-x_min)
-				percent_done = static_cast<int>(100*(x-x_min)/(x_max-x_min));
-			std::cout << "\rCalculating field: " << percent_done << "%" << std::flush;
 		}
+		percent_done = std::round(100 * (i+1) / static_cast<double>(x_nr_steps));
+		std::cout << "\rCalculating field: " << percent_done << "%" << std::flush;
+		outfile << '\n';
 	}
+	gsl_integration_workspace_free(workspace);
 	std::cout << "\rCalculating field: 100%.\n\n";
 	outfile.close();
 
 	std::cout << "Saving the curve to " << CURVE_DAT << " ...\n";
 	outfile.open(CURVE_DAT);
-	for(double t=0; t<curve->period; t+=step) {
+	for(double t = - curve->period/2; t <= curve->period/2 ;t += 1.E-2*curve->period/z_nr_steps) {
 		outfile << curve->parametrize(t) << std::endl;
 	}
 	outfile.close();
@@ -376,8 +381,8 @@ int main()
 	   << "set ylabel 'z[m]' font ',14'\n"
 	   << "set key font ',14'\n";
 	
-	gp << "plot[" << -3*distance << ":" << 3*distance << "]" 
-		<<"[" << -3*distance << ":" << 3*distance << "] "
+	gp << "plot[" << x_min << ":" << x_max << "]" 
+		<<"[" << z_min << ":" << z_max << "] "
 		<<"'"<< FIELD_DAT << "' using 1:3:(" << max_len / max_field <<" * $4)"
 				   << ":(" << max_len / max_field <<" * $8) with vectors "
 		<<"lc rgb 'dark-green' title 'field',"

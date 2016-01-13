@@ -12,7 +12,7 @@ If you don't have Boost installed, run `install_boost.sh`.
 If you don't have GSL installed, run `install_gsl.sh`.
 
 
-Now run the `compile.sh` script which will generate the `Makefile` used for actual compilation. Provided Makefile should work on lilo4 (or any other linux system). However, if you use a Windows computer... well, just ssh into lilo4 and it'll save you a lot of trouble. You can execute it by simply running the `make` command.
+Now run the `compile.sh` script which will generate the `Makefile` used for actual compilation. Provided Makefile should work on lilo4 (or any other linux system). However, if you use a Windows computer... well, just ssh into lilo4 and it'll save you a lot of trouble. You can execute the makefile it by simply running the `make` command.
 
 
 ##Running the code

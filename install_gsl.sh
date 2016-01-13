@@ -16,16 +16,16 @@ if [[ $answer == no ]]; then
 fi
 
 # Download Boost
-#echo "Downloading GSL. This may take some time... "
-#if ! which wget >/dev/null; then
-#	echo "You don't have wget installed. Install it first by rinning 'sudo apt-get install wget'."
-#	exit 1
-#fi
-#if ! wget ftp://ftp.gnu.org/gnu/gsl/gsl-2.1.tar.gz; then
-#	echo "Error, could not complete download."
-#	exit 1
-#fi
-#echo "Done"
+echo "Downloading GSL. This may take some time... "
+if ! which wget >/dev/null; then
+	echo "You don't have wget installed. Install it first by rinning 'sudo apt-get install wget'."
+	exit 1
+fi
+if ! wget ftp://ftp.gnu.org/gnu/gsl/gsl-2.1.tar.gz; then
+	echo "Error, could not complete download."
+	exit 1
+fi
+echo "Done"
 
 prefix=$PWD
 
@@ -45,4 +45,6 @@ if [[ ! $? ]]; then
 fi
 echo "Done"
 
+rm -r gsl-2.1
+rm gsl-2.1.tar.gz
 echo "Successfully installed gsl!"

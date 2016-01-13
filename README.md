@@ -7,12 +7,14 @@ Libraries needed to build the code:
 - Boost.System;
 - GSL (GNU Scientific Library);
 - You also need a gnuplot binary to make the plots.
+If you don't have Boost installed, run `install_boost.sh`.
+If you don't have GSL installed, run `install_gsl.sh`.
 
-Provided Makefile should work on lilo4 (or any other linux system). However, if you use an OS X or Windows computer... well, just ssh into lilo4 and it'll save you a lot of trouble.
-
+Now run the `compile.sh` script which will generate the `Makefile` used for actual compilation.
+Provided Makefile should work on lilo4 (or any other linux system). However, if you use a Windows computer... well, just ssh into lilo4 and it'll save you a lot of trouble. You can execute it by simply running the `make` command.
 
 ##Running the code
-First, you'll need to edit config.txt file, containing configuration of the coil. Only two shapes are supported now: Circle and Coil. It is quite easy to add more shapes if you have some basic understanding of C++. config.txt must have the following form:
+First, you'll need to edit config.txt file, containing configuration of the coil. Only two shapes are supported now: Circle and Coil. It is quite easy to add more shapes if you have some basic understanding of C++. config.txt must have one of the following forms:
 - for Circle:
 ```
 SHAPE: CIRCLE
@@ -55,6 +57,7 @@ where `<number>` stands some number.
 Now you can run the program with `./main`. It produces two files: 
 - `curve.dat` containing the information about the curve (Circle or Coil);
 - `field.dat` containing tha values of the B-field at different points.
+Names of the files can be changed by editing the `configure.h` file, which controls the compile time options whereas `config.txt` controls the run-time behavior.
 
 
 ##More control over the code

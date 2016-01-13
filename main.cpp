@@ -45,13 +45,11 @@ public:
 
 
 class Circle : public Curve {
-/*
- * Class Circle represents a circle of diameter d in the x-y plane.
- */
 private:
 	double R;
+	double wireR;
 public:
-	Circle(double R_, double current_) : Curve{2*M_PI, current_}, R{R_} {}
+	Circle(double R_, double current_, double wireR_) : Curve{2*M_PI, current_}, R{R_}, wireR{wireR_} {}
 
 	virtual vector3D parametrize(double t) const noexcept override
 	{
@@ -65,9 +63,10 @@ public:
 
 	virtual bool is_singular(const vector3D& r) const noexcept override
 	{
-		double tmp = sqrt(r.x*r.x + r.y*r.y);
-		return (-0.01*R < r.z && r.z < 0.01*R)
-			&& (0.985*R < tmp && tmp < 1.01*R);
+		return ( - wireR/2 + R < r.length() && r.length() < R + wireR/2);
+		//double tmp = sqrt(r.x*r.x + r.y*r.y);
+		//return (-0.01*R < r.z && r.z < 0.01*R)
+		//	&& (0.985*R < tmp && tmp < 1.01*R);
 	}
 	virtual ~Circle() noexcept =default;
 
@@ -78,9 +77,10 @@ class Coil : public Curve {
 private:
 	double R;
 	double length;
+	double wireR;
 public:
-	Coil(double R_, double current_, std::size_t n, double length_) 
-		: Curve{n*2*M_PI, current_}, R{R_}, length{length_} 
+	Coil(double R_, double current_, std::size_t n, double length_, double wireR_) 
+		: Curve{n*2*M_PI, current_}, R{R_}, length{length_}, wireR{wireR_} 
 	{}
 
 	virtual vector3D parametrize(double t) const noexcept override
@@ -93,11 +93,14 @@ public:
 		return vector3D(-R * sin(t), R * cos(t), length / period);
 	}
 
-	virtual bool is_singular(const vector3D& r) const noexcept override
+	virtual bool is_singular(const vector3D& v) const noexcept override
 	{
-		double tmp = sqrt(r.x*r.x + r.y*r.y);
-		return (-0.01*length < r.z && r.z < 1.01*length) 
-			&& (0.985*R < tmp && tmp < 1.01*R);
+		double t = period * v.z / length;
+		return ( - wireR/2. + R*cos(t) < v.x && v.x < R*cos(t) + wireR/2. )
+			&& ( - wireR/2. + R*sin(t) < v.y && v.y < R*sin(t) + wireR/2. );
+		//double tmp = sqrt(r.x*r.x + r.y*r.y);
+		//return (-0.01*length < r.z && r.z < 1.01*length) 
+		//	&& (0.985*R < tmp && tmp < 1.01*R);
 	}
 
 	virtual ~Coil() noexcept =default;
@@ -146,7 +149,7 @@ std::tuple<vector3D, vector3D> biot_savart(Curve* curve, const vector3D &point, 
 }
 
 
-void read_circle(std::ifstream& infile, double& distance, Curve* &curve) {
+void read_circle(std::ifstream& infile, Curve* &curve) {
 	std::string str;
 	
 	infile >> str;				
@@ -171,11 +174,21 @@ void read_circle(std::ifstream& infile, double& distance, Curve* &curve) {
 	infile >> current;
 	std::cout << "\tcurrent = " << current << "\n";
 	
-	distance = radius;
-	curve = new Circle(radius, current);
+	infile >> str;				
+	if(str != "WIRE_RADIUS:") {
+		std::cerr << "expected 'WIRE_RADIUS:', but" << str << "was found\n"
+			  << "terminating...\n";
+		infile.close();
+		exit(1);
+	}
+	double wireR = 0;
+	infile >> wireR;
+	std::cout << "\twireR = " << wireR << "\n";
+	
+	curve = new Circle(radius, current, wireR);
 }
 
-void read_coil(std::ifstream& infile, double& distance, Curve* &curve) {
+void read_coil(std::ifstream& infile, Curve* &curve) {
 	std::string str;
 	infile >> str;				
 	if(str != "RADIUS:") {
@@ -221,8 +234,20 @@ void read_coil(std::ifstream& infile, double& distance, Curve* &curve) {
 	infile >> length;
 	std::cout << "\tlength = " << length << "\n";
 
-	curve = new Coil(radius, current, nr_turns, length);
-	distance = radius + 0.5 * length;
+	infile >> str;				
+	if(str != "WIRE_RADIUS:") {
+		std::cerr << "expected 'WIRE_RADIUS:', but" << str << "was found\n"
+			  << "terminating...\n";
+		infile.close();
+		exit(1);
+	}
+	double wireR = 0;
+	infile >> wireR;
+	std::cout << "\twireR = " << wireR << "\n";
+	
+
+
+	curve = new Coil(radius, current, nr_turns, length, wireR);
 }
 
 void read_range(std::ifstream& infile, const std::string& pre, double& min, double& max, std::size_t& nr_steps, double& step) 
@@ -295,7 +320,7 @@ int main()
 
 	Curve* curve = nullptr;
 	infile >> str;
-	double distance, max_len;
+	double max_len;
 	std::size_t x_nr_steps, y_nr_steps, z_nr_steps;
 	double x_min, x_max, x_step;
 	double y_min, y_max, y_step;
@@ -304,11 +329,11 @@ int main()
 		switch(convert_to_shape.at(str.c_str())) {
 			case Shape::Circle:
 				std::cout << "\tshape = " << "Shape::Circle\n";
-				read_circle(infile, distance, curve);
+				read_circle(infile, curve);
 				break;
 			case Shape::Coil:
 				std::cout << "\tshape = " << "Shape::Coil\n";
-				read_coil(infile, distance, curve);
+				read_coil(infile, curve);
 				break;
 		}
 		read_range(infile, "X", x_min, x_max, x_nr_steps, x_step);

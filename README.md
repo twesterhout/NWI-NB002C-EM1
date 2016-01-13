@@ -18,6 +18,7 @@ First, you'll need to edit config.txt file, containing configuration of the coil
 SHAPE: CIRCLE
 RADIUS: <number>
 CURRENT: <number>
+WIRE_RADIUS: <number>
 X_MIN: <number>
 X_MAX: <number>
 X_NR_STEPS: <number>
@@ -37,6 +38,7 @@ RADIUS: <number>
 CURRENT: <number>
 NR_TURNS: <number>
 LENGTH: <number>
+WIRE_RADIUS: <number>
 X_MIN: <number>
 X_MAX: <number>
 X_NR_STEPS: <number>

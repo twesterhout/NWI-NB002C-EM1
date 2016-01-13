@@ -8,7 +8,7 @@ Libraries needed to build the code:
 - GSL (GNU Scientific Library);
 - You also need a gnuplot binary to make the plots.
 
-If you don't have Boost installed, run `install_boost.sh`.
+If you don't have Boost installed, run `install_boost.sh`. If you get errors about `bzlib.h` header missing, just run `sudo apt-get install libbz2-dev` and then execute `install_boost.sh` again.
 If you don't have GSL installed, run `install_gsl.sh`.
 
 

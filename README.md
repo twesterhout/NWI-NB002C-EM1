@@ -33,6 +33,7 @@ Z_MIN: <number>
 Z_MAX: <number>
 Z_NR_STEPS: <number>
 MAX_LEN: <number>
+FORMAT: <number>
 ```
 
 - for Coil:
@@ -53,8 +54,9 @@ Z_MIN: <number>
 Z_MAX: <number>
 Z_NR_STEPS: <number>
 MAX_LEN: <number>
+FORMAT: <number>
 ```
-where `<number>` stands some number.
+where `<number>` stands some number. `FORMAT` may be `0` or `1`: `0` standing for plotting the vector field and `1` for the color map.
 
 Now you can run the program with `./main`. It produces two files: 
 - `curve.dat` containing the information about the curve (Circle or Coil);

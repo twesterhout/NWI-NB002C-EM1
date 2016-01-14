@@ -22,9 +22,9 @@ extern "C" {
 
 std::ostream& operator <<(std::ostream& out, const std::tuple<vector3D, vector3D>& field) 
 {
-	out << std::get<0>(field).x << '\t' << std::get<1>(field).x
-	    << '\t' << std::get<0>(field).y << '\t' << std::get<1>(field).y
-	    << '\t' << std::get<0>(field).z << '\t' << std::get<1>(field).z;
+	out << get<0>(std::get<0>(field)) << '\t' << get<0>(std::get<1>(field))
+	    << '\t' << get<1>(std::get<0>(field)) << '\t' << get<1>(std::get<1>(field))
+	    << '\t' << get<2>(std::get<0>(field)) << '\t' << get<2>(std::get<1>(field));
 	return out;
 }
 
@@ -32,24 +32,23 @@ std::ostream& operator <<(std::ostream& out, const std::tuple<vector3D, vector3D
 
 class Curve {
 public:
-	double current; // current through the curve
+	const double current; // current through the curve
 	const double period;
+	const double wireR; 
 
-	Curve(double period_, double current_) : period{period_}, current{current_} {}
+	Curve(double period_, double current_, double wireR_) : period{period_}, current{current_}, wireR{wireR_} {}
 
 	virtual vector3D diff_el(double t) const noexcept =0;
 	virtual vector3D parametrize(double t) const noexcept =0;
-	virtual bool is_singular(const vector3D& r) const noexcept =0;
 	virtual ~Curve() noexcept =default;
 };
 
 
 class Circle : public Curve {
 private:
-	double R;
-	double wireR;
+	const double R;
 public:
-	Circle(double R_, double current_, double wireR_) : Curve{2*M_PI, current_}, R{R_}, wireR{wireR_} {}
+	Circle(double R_, double current_, double wireR_) : Curve{2*M_PI, current_, wireR_}, R{R_} {}
 
 	virtual vector3D parametrize(double t) const noexcept override
 	{
@@ -61,13 +60,6 @@ public:
 		return vector3D(-R * sin(t), R * cos(t), 0);
 	}
 
-	virtual bool is_singular(const vector3D& r) const noexcept override
-	{
-		return ( - wireR/2 + R < r.length() && r.length() < R + wireR/2);
-		//double tmp = sqrt(r.x*r.x + r.y*r.y);
-		//return (-0.01*R < r.z && r.z < 0.01*R)
-		//	&& (0.985*R < tmp && tmp < 1.01*R);
-	}
 	virtual ~Circle() noexcept =default;
 
 };
@@ -75,12 +67,11 @@ public:
 
 class Coil : public Curve {
 private:
-	double R;
-	double length;
-	double wireR;
+	const double R;
+	const double length;
 public:
 	Coil(double R_, double current_, std::size_t n, double length_, double wireR_) 
-		: Curve{n*2*M_PI, current_}, R{R_}, length{length_}, wireR{wireR_} 
+		: Curve{n*2*M_PI, current_, wireR_}, R{R_}, length{length_}
 	{}
 
 	virtual vector3D parametrize(double t) const noexcept override
@@ -91,16 +82,6 @@ public:
 	virtual vector3D diff_el(double t) const noexcept override
 	{
 		return vector3D(-R * sin(t), R * cos(t), length / period);
-	}
-
-	virtual bool is_singular(const vector3D& v) const noexcept override
-	{
-		double t = period * v.z / length;
-		return ( - wireR/2. + R*cos(t) < v.x && v.x < R*cos(t) + wireR/2. )
-			&& ( - wireR/2. + R*sin(t) < v.y && v.y < R*sin(t) + wireR/2. );
-		//double tmp = sqrt(r.x*r.x + r.y*r.y);
-		//return (-0.01*length < r.z && r.z < 1.01*length) 
-		//	&& (0.985*R < tmp && tmp < 1.01*R);
 	}
 
 	virtual ~Coil() noexcept =default;
@@ -120,7 +101,19 @@ double integrand(double t, void* params)
 {
 	Params* p = static_cast<Params*>(params);
 	vector3D r = *(p->point) - p->curve->parametrize(t);
-	return p->curve->current * cross_product<Index>(p->curve->diff_el(t), r) / pow(r.length(), 3.);
+	if(r.length()==0) 
+		return 0;
+	
+	vector3D dl = p->curve->diff_el(t);
+	double cos_theta = 1.0 / (r.length() * dl.length()) * (r * dl);
+	double d_to_center = sqrt(1 - pow(cos_theta, 2)) * r.length();
+	
+	if(d_to_center < p->curve->wireR) {
+		return p->curve->current * pow(d_to_center, 2)/pow(p->curve->wireR, 2) 
+			* cross_product<Index>(dl, r) / pow(r.length(), 3.);
+	}
+	return p->curve->current 
+		* cross_product<Index>(dl, r) / pow(r.length(), 3.);
 }
 
 
@@ -131,19 +124,15 @@ std::tuple<vector3D, vector3D> biot_savart(Curve* curve, const vector3D &point, 
 	vector3D error{0, 0, 0};
 	Params params(curve, &point);
 
-	//gsl_integration_workspace* workspace = gsl_integration_workspace_alloc(LIMIT);
-	
 	gsl_function f = {&integrand<0>, static_cast<void*>(&params)};
 	gsl_integration_qag (	&f, - curve->period/2, curve->period/2, ABS_ERROR, REL_ERROR, LIMIT, 
-				KEY, workspace, &result.x, &error.x);
+				KEY, workspace, &get<0>(result), &get<0>(error));
 	f.function = &integrand<1>;
 	gsl_integration_qag (	&f, - curve->period/2, curve->period/2, ABS_ERROR, REL_ERROR, LIMIT, 
-				KEY, workspace, &result.y, &error.y);
+				KEY, workspace, &get<1>(result), &get<1>(error));
 	f.function = &integrand<2>;
 	gsl_integration_qag (	&f, - curve->period/2, curve->period/2, ABS_ERROR, REL_ERROR, LIMIT, 
-				KEY, workspace, &result.z, &error.z);
-
-	//gsl_integration_workspace_free(workspace);
+				KEY, workspace, &get<2>(result), &get<2>(error));
 
 	return std::tuple<vector3D, vector3D>(MU0_4_PI * result, MU0_4_PI * error);
 }
@@ -281,10 +270,11 @@ void read_range(std::ifstream& infile, const std::string& pre, double& min, doub
 		exit(1);
 	}
 	infile >> nr_steps;
-	step = (max - min) / nr_steps;
-	if(nr_steps%2 && min != max) {
-		min += step/2.;
-		std::cout << '\t' << static_cast<char>(tolower(pre[0])) << "_min redefined, new value is " << min << "\n";
+	if(nr_steps == 1) {
+		min = (min + max) / 2.;
+		step = 0;
+	} else {
+		step = (max - min) / (nr_steps-1);
 	}
 	std::cout << '\t' << static_cast<char>(tolower(pre[0])) << "_nr_steps = " << nr_steps << "\n";
 }
@@ -325,6 +315,7 @@ int main()
 	double x_min, x_max, x_step;
 	double y_min, y_max, y_step;
 	double z_min, z_max, z_step;
+	bool format;
 	try{
 		switch(convert_to_shape.at(str.c_str())) {
 			case Shape::Circle:
@@ -349,6 +340,17 @@ int main()
 		}
 		infile >> max_len;
 		std::cout << "\tmax_len = " << max_len << "\n";
+
+		infile>>str;
+		if(str != "FORMAT:") {
+			std::cerr << "expected 'FORMAT:', but" << str << "was found\n"
+				  << "terminating...\n";
+			infile.close();
+			exit(1);
+		}
+		infile >> format;
+		std::cout << "\tformat = " << format << "\n";
+
 	} catch(const std::out_of_range& e) {
 		std::cerr << e.what() << "\n";
 		std::cerr << "Unknown shape '" << str << "'\n"
@@ -374,13 +376,15 @@ int main()
 			for(auto k=0; k < z_nr_steps; k++) {
 				double z = z_min + k*z_step;
 				vector3D point{x, y, z};
-				if( !curve->is_singular(point) ) {
-					std::tuple<vector3D, vector3D> 
-						field = biot_savart(curve, point, workspace);
-					if(std::get<0>(field).length() > max_field) 
-						max_field = std::get<0>(field).length();
-					outfile << point << '\t' << field << '\t' << std::get<0>(field).length() << '\n';
-				}
+				std::tuple<vector3D, vector3D> 
+					field = biot_savart(curve, point, workspace);
+				
+				if(std::get<0>(field).length() > max_field) 
+					max_field = std::get<0>(field).length();
+				
+				outfile << point << '\t' 
+					<< field << '\t' 
+					<< std::get<0>(field).length() << '\n';
 			}
 		}
 		percent_done = std::round(100 * (i+1) / static_cast<double>(x_nr_steps));
@@ -400,20 +404,46 @@ int main()
 	delete curve;
 	std::cout << "Done saving.\n\n";
 
+	
 	Gnuplot gp;
-	gp << "set terminal wxt size 1200, 1200\n";
-	gp << "set xlabel 'x[m]' font ',14'\n"
-	   << "set ylabel 'z[m]' font ',14'\n"
-	   << "set key font ',14'\n";
-	
-	gp << "plot[" << x_min << ":" << x_max << "]" 
-		<<"[" << z_min << ":" << z_max << "] "
-		<<"'"<< FIELD_DAT << "' using 1:3:(" << max_len / max_field <<" * $4)"
-				   << ":(" << max_len / max_field <<" * $8) with vectors "
-		<<"lc rgb 'dark-green' title 'field',"
+	switch(format){
+		case false:
+			gp << "set terminal wxt size 2400,1200\n"
+			   << "set xlabel 'x[m]' font ',20'\n"
+			   << "set ylabel 'z[m]' font ',20'\n"
+			   << "set xtics font ',20'\n"
+			   << "set ytics font ',20'\n"
+			   << "set key font ',20'\n"
+			   << "set key below\n";
+			
+			gp << "plot[" << x_min << ":" << x_max << "]" 
+				<<"[" << z_min << ":" << z_max << "] "
+				<<"'"<< FIELD_DAT << "' using 1:3:(" << max_len / max_field <<" * $4)"
+						   << ":(" << max_len / max_field <<" * $8) with vectors "
+				<<"lc rgb 'dark-green' title 'field', "
+				<< "'" << CURVE_DAT <<"' using 1:3 with lines lc rgb '#FF763A' title 'curve'\n";
+			break;
+		case true:
+			gp << "set terminal wxt size 2400,1200\n"
+			   << "set xlabel 'x[m]' font ',20'\n"
+			   << "set ylabel 'z[m]' font ',20'\n"
+			   << "set xtics font ',20'\n"
+			   << "set ytics font ',20'\n"
+			   << "set key font ',20'\n"
+			   << "set key below\n";
+			
 
-		<< "'" << CURVE_DAT <<"' using 1:3 with lines lc rgb '#FF763A' title 'curve'\n";
-	
+			gp << "set pm3d\n"
+			   << "set pm3d map\n";
+			gp << "splot[" << x_min << ":" << x_max << "]" 
+				<< "[" << z_min << ":" << z_max << "] "
+				<< "'" << FIELD_DAT << "' using 1:3:10 notitle, "
+				<< "'' using 1:3:(" << y_min << "):(" << max_len / 10.0 <<" * $4/$10):(" << max_len / 10.0 <<" * $8/$10):(" << y_min << ") "
+					<< "with vectors lt 1 lw 2 lc rgb 'dark-green' title 'direction of the field', "
+				<< "'" << CURVE_DAT <<"' using 1:3:(" << y_min << ") with lines lt 1 lw 2 lc rgb '#FF763A' title 'curve'\n";
+			break;
+	}
+
 	return 0;
 }
 

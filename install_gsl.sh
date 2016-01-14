@@ -43,6 +43,7 @@ if [[ ! $? ]]; then
 	echo "Error, could not install libraries"
 	exit 1
 fi
+cd ..
 echo "Done"
 
 rm -r gsl-2.1

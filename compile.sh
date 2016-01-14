@@ -6,6 +6,7 @@ while [[ $used_boost != "no" && $used_boost != "yes" ]]; do
 	echo "please, answer 'yes' or 'no'"
 	read used_boost
 done
+echo "used boost = |$used_boost|"
 
 echo "Have you used 'install_gsl.sh' to install GSL or you had it installed already? (yes/no)"
 read used_gsl
@@ -13,16 +14,17 @@ while [[ $used_boost != "no" && $used_boost != "yes" ]]; do
 	echo "please, answer 'yes' or 'no'"
 	read used_gsl
 done
+echo "used gsl = |$used_gsl|"
 
 rm Makefile
-if [[ used_boost ]]; then
+if [[ $used_boost == "yes" ]]; then
 	BOOST_LIBS="$PWD/boost/lib/libboost_filesystem.a $PWD/boost/lib/libboost_system.a $PWD/boost/lib/libboost_iostreams.a"
 	BOOST_INCLUDE="-I$PWD/boost/include"
 else
 	BOOST_LIBS="-lboost_filesystem -lboost_system -lboost_iostreams"
 fi
 
-if [[ used_gsl ]]; then
+if [[ $used_gsl == "yes" ]]; then
 	GSL_LIBS="$PWD/gsl/lib/libgsl.a $PWD/gsl/lib/libgslcblas.a"
 	GSL_INCLUDE="-I$PWD/gsl/include"
 else

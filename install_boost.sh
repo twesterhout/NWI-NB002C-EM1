@@ -47,10 +47,11 @@ if [[ ! $? ]]; then
 	echo "Error, could not install libraries"
 	exit 1
 fi
+cd ..
 echo "Done"
 
-echo "-L$prefix/boost/lib"
-echo "-I$prefix/boost/include"
 
 rm -r boost_1_60
 rm download
+
+echo "Successfully installed Boost!"

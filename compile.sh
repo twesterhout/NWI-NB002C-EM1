@@ -6,7 +6,6 @@ while [[ $used_boost != "no" && $used_boost != "yes" ]]; do
 	echo "please, answer 'yes' or 'no'"
 	read used_boost
 done
-echo "used boost = |$used_boost|"
 
 echo "Have you used 'install_gsl.sh' to install GSL or you had it installed already? (yes/no)"
 read used_gsl
@@ -14,7 +13,6 @@ while [[ $used_boost != "no" && $used_boost != "yes" ]]; do
 	echo "please, answer 'yes' or 'no'"
 	read used_gsl
 done
-echo "used gsl = |$used_gsl|"
 
 rm Makefile
 if [[ $used_boost == "yes" ]]; then
@@ -31,5 +29,5 @@ else
 	GSL_LIBS="-lgsl -lgslcblas"
 fi
 
-echo "main: main.cpp
+echo "main: main.cpp configure.h vector3D.h
 	g++ -std=c++11 -o main main.cpp -lm $BOOST_LIBS $GSL_LIBS $BOOST_INCLUDE $GSL_INCLUDE" >> Makefile
